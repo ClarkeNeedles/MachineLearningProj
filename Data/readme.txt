@@ -1,3 +1,5 @@
+Structure of HDF5 file for data
+
 /
  ├── Raw Data
  │    ├── Andrew P
