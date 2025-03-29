@@ -1,12 +1,12 @@
 import h5py
 import pandas as pd
 
-data1 = pd.read_csv('/MachineLearningProj/Data/JumpingPhoneInBackPocket.csv')
-data2 = pd.read_csv('/MachineLearningProj/Data/WalkingPhoneInBackPocket.csv')
-data3 = pd.read_csv('/MachineLearningProj/Data/JumpingPhoneInFrontPocket.csv')
-data4 = pd.read_csv('/MachineLearningProj/Data/WalkingPhoneInFrontPocket.csv')
-data5 = pd.read_csv('/MachineLearningProj/Data/JumpingPhoneInHand.csv')
-data6 = pd.read_csv('/MachineLearningProj/Data/WalkingPhoneInHand.csv')
+data1 = pd.read_csv('../Data/JumpingPhoneInBackPocket.csv')
+data2 = pd.read_csv('../Data/WalkingPhoneInBackPocket.csv')
+data3 = pd.read_csv('../Data/JumpingPhoneInFrontPocket.csv')
+data4 = pd.read_csv('../Data/WalkingPhoneInFrontPocket.csv')
+data5 = pd.read_csv('../Data/JumpingPhoneInHand.csv')
+data6 = pd.read_csv('../Data/WalkingPhoneInHand.csv')
 
 with h5py.File('project_data.h5', 'w') as h5:
 
