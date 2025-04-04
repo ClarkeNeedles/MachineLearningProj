@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 import os
 
 def read_and_clean_csv(filepath):
@@ -335,52 +335,162 @@ Desktop App using Tkinter
 def run_app():
     root = tk.Tk()
     root.title("Activity Classification App")
-    root.geometry("500x200")
+    root.geometry("650x350")
+    root.resizable(False, False)
+
+    # Configure style
+    style = ttk.Style()
+    style.theme_use('clam')  # Modern theme
+
+    # Color scheme
+    bg_color = '#f5f5f5'
+    button_color = '#4a7a8c'
+    text_color = '#333333'
+
+    root.configure(bg=bg_color)
 
     selected_file = tk.StringVar()
 
+    # Main container
+    main_frame = ttk.Frame(root, padding="20")
+    main_frame.pack(fill=tk.BOTH, expand=True)
+
+    # Header
+    header = ttk.Label(main_frame,
+                       text="Activity Classification App",
+                       font=('Helvetica', 16, 'bold'),
+                       foreground=button_color)
+    header.pack(pady=(0, 15))
+
+    # File section
+    file_frame = ttk.LabelFrame(main_frame, text="1. Load Data", padding=10)
+    file_frame.pack(fill=tk.X, pady=5)
+
     def load_file():
-        file_path = filedialog.askopenfilename(title="Select Input CSV File", filetypes=[("CSV files", "*.csv")])
+        file_path = filedialog.askopenfilename(
+            title="Select Input CSV File",
+            filetypes=[("CSV files", "*.csv")]
+        )
         if file_path:
             selected_file.set(file_path)
-            lbl_file.config(text="Loaded: " + os.path.basename(file_path))
+            lbl_file.config(
+                text="Loaded: " + os.path.basename(file_path),
+                foreground='#2E7D32'  # Green
+            )
+            btn_run.state(['!disabled'])  # Enable predict button
             print(f"File loaded: {file_path}")
 
+    btn_load = ttk.Button(
+        file_frame,
+        text="Browse CSV File",
+        command=load_file,
+        style='Accent.TButton'
+    )
+    btn_load.pack(pady=5, fill=tk.X)
+
+    lbl_file = ttk.Label(
+        file_frame,
+        text="No file selected",
+        foreground='#616161',  # Gray
+        font=('Helvetica', 9)
+    )
+    lbl_file.pack(pady=5)
+
+    # Prediction section
+    pred_frame = ttk.LabelFrame(main_frame, text="2. Run Analysis", padding=10)
+    pred_frame.pack(fill=tk.X, pady=10)
+
     def save_output(output_df):
-        out_path = filedialog.asksaveasfilename(title="Save Output CSV", defaultextension=".csv",
-                                                filetypes=[("CSV files", "*.csv")])
+        out_path = filedialog.asksaveasfilename(
+            title="Save Results",
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv")]
+        )
         if out_path:
             output_df.to_csv(out_path, index=False)
-            messagebox.showinfo("Success", f"Output saved to {out_path}")
+            messagebox.showinfo(
+                "Success",
+                f"Results saved to:\n{os.path.basename(out_path)}",
+                parent=root
+            )
             print(f"Output saved to: {out_path}")
 
     def run_prediction():
         if not selected_file.get():
-            messagebox.showerror("Error", "Please load an input CSV file first.")
+            messagebox.showerror(
+                "Error",
+                "Please select a CSV file first",
+                parent=root
+            )
             return
+
         try:
             output_df, segs = predict_from_file(selected_file.get(), segment_duration=5)
             save_output(output_df)
-            plt.figure(figsize=(8, 4))
-            plt.scatter(output_df['Segment_Index'], output_df['Predicted_Label'],
-                        c=output_df['Predicted_Label'], cmap='coolwarm', marker='o')
-            plt.xlabel("Segment Index")
-            plt.ylabel("Predicted Label (0: Walking, 1: Jumping)")
-            plt.title("Predictions for Each 5-Second Segment")
-            plt.grid(True)
+
+            # Configure plot
+            plt.style.use('seaborn')
+            fig, ax = plt.subplots(figsize=(9, 5))
+            scatter = ax.scatter(
+                output_df['Segment_Index'],
+                output_df['Predicted_Label'],
+                c=output_df['Predicted_Label'],
+                cmap='RdYlBu',
+                marker='o',
+                s=120,
+                alpha=0.8,
+                edgecolors='w',
+                linewidth=0.5
+            )
+
+            ax.set_xlabel("Segment Index", fontsize=11)
+            ax.set_ylabel("Activity Class", fontsize=11)
+            ax.set_title("Prediction Results (5-Second Segments)", fontsize=13, pad=15)
+            ax.grid(True, linestyle=':', alpha=0.7)
+
+            cbar = plt.colorbar(scatter)
+            cbar.set_label('0: Walking   |   1: Jumping', rotation=270, labelpad=15)
+            plt.tight_layout()
             plt.show()
+
         except Exception as e:
-            messagebox.showerror("Error", str(e))
-            print("Error during prediction:", e)
+            messagebox.showerror(
+                "Processing Error",
+                f"Could not process file:\n{str(e)}",
+                parent=root
+            )
+            print("Error:", e)
 
-    btn_load = tk.Button(root, text="Load Input CSV", command=load_file)
-    btn_load.pack(pady=10)
+    btn_run = ttk.Button(
+        pred_frame,
+        text="Run Activity Prediction",
+        command=run_prediction,
+        style='Accent.TButton',
+        state='disabled'  # Disabled until file is loaded
+    )
+    btn_run.pack(pady=0, fill=tk.X)
 
-    lbl_file = tk.Label(root, text="No file loaded")
-    lbl_file.pack(pady=5)
+    # Status bar
+    status_bar = ttk.Label(
+        root,
+        text="Ready",
+        relief=tk.SUNKEN,
+        anchor=tk.W,
+        padding=(10, 5),
+        font=('Helvetica', 8)
+    )
+    status_bar.pack(fill=tk.X, side=tk.BOTTOM)
 
-    btn_run = tk.Button(root, text="Run Prediction", command=run_prediction)
-    btn_run.pack(pady=10)
+    # Style configurations
+    style.configure('TLabelFrame', background=bg_color, bordercolor='#e0e0e0')
+    style.configure('TLabelFrame.Label', font=('Helvetica', 10, 'bold'))
+    style.configure('Accent.TButton',
+                    foreground='white',
+                    background=button_color,
+                    font=('Helvetica', 10),
+                    padding=5)
+    style.map('Accent.TButton',
+              background=[('active', '#3a6a7c'), ('pressed', '#2a5a6c')])
 
     root.mainloop()
 
