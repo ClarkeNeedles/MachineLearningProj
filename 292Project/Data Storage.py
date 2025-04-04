@@ -335,18 +335,20 @@ Desktop App using Tkinter
 def run_app():
     root = tk.Tk()
     root.title("Activity Classification App")
-    root.geometry("650x350")
+    # App size, ensure fixed size
+    root.geometry("650x375")
     root.resizable(False, False)
 
-    # Configure style
+    # Use a ttk style object
     style = ttk.Style()
-    style.theme_use('clam')  # Modern theme
+    style.theme_use('clam')
 
-    # Color scheme
+    # Colours
     bg_color = '#f5f5f5'
     button_color = '#4a7a8c'
     text_color = '#333333'
 
+    # Assigning background colour
     root.configure(bg=bg_color)
 
     selected_file = tk.StringVar()
@@ -367,19 +369,25 @@ def run_app():
     file_frame.pack(fill=tk.X, pady=5)
 
     def load_file():
+        # Only allow .csv files
         file_path = filedialog.askopenfilename(
             title="Select Input CSV File",
             filetypes=[("CSV files", "*.csv")]
         )
+        # If a file path is chosen
         if file_path:
             selected_file.set(file_path)
+            # Update the load csv file label
             lbl_file.config(
                 text="Loaded: " + os.path.basename(file_path),
-                foreground='#2E7D32'  # Green
+                # Green
+                foreground='#2E7D32'
             )
-            btn_run.state(['!disabled'])  # Enable predict button
+            # Enable run button
+            btn_run.state(['!disabled'])
             print(f"File loaded: {file_path}")
 
+    # Load csv file button
     btn_load = ttk.Button(
         file_frame,
         text="Browse CSV File",
@@ -388,10 +396,12 @@ def run_app():
     )
     btn_load.pack(pady=5, fill=tk.X)
 
+    # Load csv file status label
     lbl_file = ttk.Label(
         file_frame,
         text="No file selected",
-        foreground='#616161',  # Gray
+        # Gray
+        foreground='#616161',
         font=('Helvetica', 9)
     )
     lbl_file.pack(pady=5)
@@ -400,6 +410,7 @@ def run_app():
     pred_frame = ttk.LabelFrame(main_frame, text="2. Run Analysis", padding=10)
     pred_frame.pack(fill=tk.X, pady=10)
 
+    # For saving the .csv file
     def save_output(output_df):
         out_path = filedialog.asksaveasfilename(
             title="Save Results",
@@ -416,6 +427,7 @@ def run_app():
             print(f"Output saved to: {out_path}")
 
     def run_prediction():
+        # Error message
         if not selected_file.get():
             messagebox.showerror(
                 "Error",
@@ -424,6 +436,7 @@ def run_app():
             )
             return
 
+        # Running prediction
         try:
             output_df, segs = predict_from_file(selected_file.get(), segment_duration=5)
             save_output(output_df)
@@ -449,7 +462,7 @@ def run_app():
             ax.grid(True, linestyle=':', alpha=0.7)
 
             cbar = plt.colorbar(scatter)
-            cbar.set_label('0: Walking   |   1: Jumping', rotation=270, labelpad=15)
+            cbar.set_label('1: Jumping | 0: Walking', rotation=270, labelpad=15)
             plt.tight_layout()
             plt.show()
 
@@ -461,25 +474,16 @@ def run_app():
             )
             print("Error:", e)
 
+    # Run prediction button
     btn_run = ttk.Button(
         pred_frame,
         text="Run Activity Prediction",
         command=run_prediction,
         style='Accent.TButton',
-        state='disabled'  # Disabled until file is loaded
+        # Disabled until file selected
+        state='disabled'
     )
     btn_run.pack(pady=0, fill=tk.X)
-
-    # Status bar
-    status_bar = ttk.Label(
-        root,
-        text="Ready",
-        relief=tk.SUNKEN,
-        anchor=tk.W,
-        padding=(10, 5),
-        font=('Helvetica', 8)
-    )
-    status_bar.pack(fill=tk.X, side=tk.BOTTOM)
 
     # Style configurations
     style.configure('TLabelFrame', background=bg_color, bordercolor='#e0e0e0')
