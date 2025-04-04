@@ -114,13 +114,13 @@ def segment_data_by_time(pp_df, segment_duration=5):
 
 def extract_features(segment):
     """
-    Extracts 17 features from a segment
+    Extracts 14 features from a segment
     For each axis (x, y, z), computes:
-      - Mean, Standard Deviation, Minimum, Maximum, and Range
+      - Mean, Standard Deviation, Minimum, Maximum
     Additionally, computes:
       - max_jerk: the maximum absolute difference between consecutive samples across all axes
       - max_acc: the maximum L2 norm (overall acceleration magnitude) across the segment
-    Returns a dictionary of 17 features
+    Returns a dictionary of 14 features
     """
 
     features = {}
@@ -132,11 +132,11 @@ def extract_features(segment):
         features[f'std_{axis}'] = np.std(data)
         features[f'min_{axis}'] = np.min(data)
         features[f'max_{axis}'] = np.max(data)
-        features[f'range_{axis}'] = np.max(data) - np.min(data)
 
     # Compute max jerk for each axis, then take the maximum
     jerk_vals = []
-    for i in range(segment.shape[1]):  # for each axis (column)
+    # for each column/axis
+    for i in range(segment.shape[1]):
         axis_data = segment[:, i]
         jerk = np.abs(np.diff(axis_data))
         if len(jerk) > 0:
@@ -446,8 +446,8 @@ def run_app():
             plt.style.use('ggplot')
             fig, ax = plt.subplots(figsize=(9, 5))
 
-            # Define a discrete colormap: e.g., blue for 0 (walking), red for 1 (jumping)
-            cmap = ListedColormap(['#1f77b4', '#d62728'])  # or any 2 colors you prefer
+            # Define a discrete colormap: blue for 0 (walking), red for 1 (jumping)
+            cmap = ListedColormap(['#1f77b4', '#d62728'])
 
             scatter = ax.scatter(
                 output_df['Segment_Index'],
