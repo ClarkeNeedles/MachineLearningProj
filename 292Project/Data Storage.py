@@ -442,7 +442,7 @@ def run_app():
             save_output(output_df)
 
             # Configure plot
-            plt.style.use('seaborn')
+            plt.style.use('ggplot')
             fig, ax = plt.subplots(figsize=(9, 5))
             scatter = ax.scatter(
                 output_df['Segment_Index'],
