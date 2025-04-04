@@ -11,26 +11,31 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 import os
 
-
-#############################
-# Helper Functions
-#############################
-
 def read_and_clean_csv(filepath):
     """
-    Reads a CSV file using the correct separator.
+    Reads a CSV file using the correct separator
     Uses tab if the filename contains "JumpingPhoneInHand" or "WalkingPhoneInBackPocket",
-    otherwise uses comma. Cleans up the column names.
+    otherwise uses comma. This is because the data for those two .csv files were exported
+    as a different type than the other .csv files. Also cleans up the column names
     """
+
+    # Setting the seperator
     if "JumpingPhoneInHand" in filepath or "WalkingPhoneInBackPocket" in filepath:
         sep = "\t"
     else:
         sep = ","
-    df = pd.read_csv(filepath, sep=sep, engine='python')
+
+    df = pd.read_csv(filepath, sep=sep)
+
+    # For the case that the data was misparsed
+    # As in the data is read as a singular column
+    # Because of the way the data was exported
     if df.shape[1] == 1:
-        new_cols = df.columns[0].split(sep)
-        df = df[df.columns[0]].str.split(sep, expand=True)
-        df.columns = new_cols
+        new_cols = df.columns[0].split(sep) # Splitting the first row (headers) based on the seperator
+        df = df[df.columns[0]].str.split(sep, expand=True) # Split the data into the proper columns
+        df.columns = new_cols # Assign the separated headers to the corresponding column
+
+    # Getting rid of extra white space before returning
     df.columns = df.columns.str.replace('"', '').str.strip()
     print(f"Read file {os.path.basename(filepath)} with shape: {df.shape}")
     return df
@@ -42,9 +47,11 @@ def preprocess_data(df):
       - Renames columns,
       - Converts values to numeric,
       - Fills missing values (linear interpolation then forward fill),
-      - Applies a moving average filter with window=6 (to retain more details).
+      - Applies a moving average filter with window=6 (to retain more details)
     """
+
     df = df.copy()
+    # Renaming the columns for simplicity
     if 'Time (s)' in df.columns:
         df.rename(columns={
             'Time (s)': 'time',
@@ -53,14 +60,20 @@ def preprocess_data(df):
             'Linear Acceleration z (m/s^2)': 'z',
             'Absolute acceleration (m/s^2)': 'abs_acc'
         }, inplace=True)
+
+    # Change string value to numeric values
     for col in ['time', 'x', 'y', 'z', 'abs_acc']:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
+        df[col] = pd.to_numeric(df[col])
+
+    # Linear interpolation and forward fill
     df.interpolate(method='linear', inplace=True)
     df.fillna(method='ffill', inplace=True)
+
     # Apply moving average filter (window=6) to preserve more detail
     df['x_filtered'] = df['x'].rolling(window=6, center=True).mean()
     df['y_filtered'] = df['y'].rolling(window=6, center=True).mean()
     df['z_filtered'] = df['z'].rolling(window=6, center=True).mean()
+
     print("After preprocessing, sample data:")
     print(df.head())
     return df
@@ -68,42 +81,50 @@ def preprocess_data(df):
 
 def segment_data_by_time(pp_df, segment_duration=5):
     """
-    Segments preprocessed data into windows of approximately 'segment_duration' seconds using the time column.
-    Returns a list of segments (each segment is a 2D array with columns: x, y, z).
+    Segments preprocessed data into windows of approximately 'segment_duration' seconds using the time column
+    Returns a list of segments (each segment is a 2D array with columns: x, y, z)
     """
+
+    # Dropping any extra NaN values and converting to numpy arrays
     time_array = pp_df['time'].dropna().to_numpy()
     x_array = pp_df['x_filtered'].dropna().to_numpy()
     y_array = pp_df['y_filtered'].dropna().to_numpy()
     z_array = pp_df['z_filtered'].dropna().to_numpy()
+
     segments = []
-    n = len(time_array)
     start_idx = 0
-    while start_idx < n:
+    while start_idx < len(time_array):
         start_time = time_array[start_idx]
+        # Using numpy search method
         end_idx = np.searchsorted(time_array, start_time + segment_duration, side='left')
+        # If the segment has more than 1 data point, it creates the 2D array segment
         if end_idx - start_idx > 1:
             seg = np.column_stack((x_array[start_idx:end_idx],
                                    y_array[start_idx:end_idx],
                                    z_array[start_idx:end_idx]))
+            # Append the created segment to the segments list
             segments.append(seg)
+        # Update the start index for the next segment section
         start_idx = end_idx
+
     print(f"Segmented into {len(segments)} segments of ~{segment_duration} seconds each.")
     return segments
 
 
 def extract_features(segment):
     """
-    Extracts 17 features from a segment.
+    Extracts 17 features from a segment
     For each axis (x, y, z), computes:
-      - Mean, Standard Deviation, Minimum, Maximum, and Range.
+      - Mean, Standard Deviation, Minimum, Maximum, and Range
     Additionally, computes:
-      - max_jerk: the maximum absolute difference between consecutive samples across all axes.
-      - max_acc: the maximum L2 norm (overall acceleration magnitude) across the segment.
-    Returns a dictionary of 17 features.
+      - max_jerk: the maximum absolute difference between consecutive samples across all axes
+      - max_acc: the maximum L2 norm (overall acceleration magnitude) across the segment
+    Returns a dictionary of 17 features
     """
+
     features = {}
     axes = ['x', 'y', 'z']
-    # For each axis, compute basic statistics.
+    # For each axis, compute basic statistics
     for axis in axes:
         data = segment[:, axes.index(axis)]
         features[f'mean_{axis}'] = np.mean(data)
@@ -112,7 +133,7 @@ def extract_features(segment):
         features[f'max_{axis}'] = np.max(data)
         features[f'range_{axis}'] = np.max(data) - np.min(data)
 
-    # Compute max jerk for each axis, then take the maximum.
+    # Compute max jerk for each axis, then take the maximum
     jerk_vals = []
     for i in range(segment.shape[1]):  # for each axis (column)
         axis_data = segment[:, i]
@@ -121,7 +142,7 @@ def extract_features(segment):
             jerk_vals.append(np.max(jerk))
     features['max_jerk'] = np.max(jerk_vals) if jerk_vals else 0
 
-    # Compute max acceleration as the maximum L2 norm across all samples.
+    # Compute max acceleration as the maximum L2 norm across all samples
     norms = np.linalg.norm(segment, axis=1)
     features['max_acc'] = np.max(norms)
 
@@ -130,19 +151,20 @@ def extract_features(segment):
 
 def get_label_from_filename(filepath):
     """
-    Returns 1 if "Jumping" is in the file name, 0 if "Walking" is in the file name.
+    Returns 1 if "Jumping" is in the file name, 0 if "Walking" is in the file name
     """
+
     base = os.path.basename(filepath)
+
     if "Jumping" in base:
         return 1
     elif "Walking" in base:
         return 0
 
-
-#############################
-# File Information and HDF5 Storage
-#############################
-# List of tuples: (file_path, assigned user)
+"""
+File Information and HDF5 Storage
+"""
+# List of tuples for what file is assigned to which group member
 file_info = [
     ('../Data/JumpingPhoneInBackPocket.csv', 'Ben M'),
     ('../Data/WalkingPhoneInBackPocket.csv', 'Ben M'),
@@ -152,36 +174,49 @@ file_info = [
     ('../Data/WalkingPhoneInHand.csv', 'Andrew P')
 ]
 
-# Read and preprocess each file; store in dictionaries.
+#Read and preprocess each file
+#Store in dictionaries
 raw_data_dict = {}
 pp_data_dict = {}
 for filepath, user in file_info:
     raw_data_dict[filepath] = read_and_clean_csv(filepath)
     pp_data_dict[filepath] = preprocess_data(raw_data_dict[filepath])
 
-# Create HDF5 file with required structure.
+# Create HDF5 file structure
 with h5py.File('project_data.h5', 'w') as h5:
     raw_group = h5.create_group('Raw Data')
     pp_group = h5.create_group('Pre-processed Data')
     segmented_group = h5.create_group('Segmented Data')
-    # Create subgroups for each user.
+    # Create subgroups for each member
     for user in ['Andrew P', 'Ben M', 'Clarke N']:
         raw_group.create_group(user)
         pp_group.create_group(user)
-    # Create groups for segmented data: Train and Test.
+    # Create groups for segmented data
     segmented_group.create_group('Train')
     segmented_group.create_group('Test')
-    # Store raw and preprocessed data using file names as dataset names.
+    # Store raw and preprocessed data using file names as dataset names
     for filepath, user in file_info:
         ds_name = os.path.basename(filepath)
         raw_group[user].create_dataset(ds_name, data=raw_data_dict[filepath].to_numpy())
         pp_group[user].create_dataset(ds_name, data=pp_data_dict[filepath].to_numpy())
 print("Data stored in HDF5 file.")
 
-#############################
-# Data Visualizations
-#############################
-# Visualize preprocessed data from JumpingPhoneInHand.csv.
+"""
+Print HDF5 File Structure
+"""
+with h5py.File('project_data.h5', 'r') as h5:
+    print("HDF5 File Structure:")
+    for grp in h5.keys():
+        print(f"\nGroup: {grp}")
+        for subgrp in h5[grp].keys():
+            print(f"  Subgroup: {subgrp}")
+            for ds in h5[grp][subgrp].keys():
+                print(f"    Dataset: {ds}")
+
+"""
+Data Visualizations
+"""
+# Visualize preprocessed data from JumpingPhoneInHand.csv
 pp_demo = pp_data_dict['../Data/JumpingPhoneInHand.csv']
 plt.figure(figsize=(10, 4))
 plt.plot(pp_demo['time'], pp_demo['x'], label='Original x')
@@ -192,7 +227,7 @@ plt.title('Preprocessed JumpingPhoneInHand Data')
 plt.legend()
 plt.show()
 
-# Visualize an example segment using time-based segmentation.
+# Visualize an example segment using time-based segmentation
 segments_example = segment_data_by_time(pp_demo, segment_duration=5)
 print("Example segments count (time-based):", len(segments_example))
 if segments_example:
@@ -207,49 +242,50 @@ if segments_example:
     plt.legend()
     plt.show()
 
-#############################
-# Combine Segments and Train Classifier
-#############################
+"""
+Combine Segments and Train Classifier
+"""
 all_segments = []
 all_labels = []
-# For each file, segment the preprocessed data into 5-second segments.
+# For each file, segment the preprocessed data into 5-second segments
 for filepath, user in file_info:
     pp_df = pp_data_dict[filepath]
     label = get_label_from_filename(filepath)
     segments_list = segment_data_by_time(pp_df, segment_duration=5)
     if len(segments_list) == 0:
         continue
-    # Randomize the segments from this file.
+    # Randomize the segments from this file
     np.random.shuffle(segments_list)
     all_segments.extend(segments_list)
     all_labels.extend(np.full(len(segments_list), label))
-all_segments = np.array(all_segments, dtype=object)  # Variable-length segments stored as an object array.
+# Variable-length segments stored as an object array
+all_segments = np.array(all_segments, dtype=object)
 all_labels = np.array(all_labels)
 print("Total number of segments combined:", len(all_segments))
 
-# Extract features from each segment.
+# Extract features from each segment
 features_all = [extract_features(seg) for seg in all_segments]
 features_df = pd.DataFrame(features_all)
 print("Combined Features DataFrame (first 5 rows):")
 print(features_df.head())
 
-# Split features (X) and labels (y) into training (90%) and testing (10%) sets.
+# Split features (X) and labels (y) into training (90%) and testing (10%) sets
 X_train_feat, X_test_feat, y_train, y_test = train_test_split(features_df, all_labels, test_size=0.1, random_state=42,
                                                               shuffle=True)
 print("Training feature set shape:", X_train_feat.shape)
 print("Testing feature set shape:", X_test_feat.shape)
 
-# Normalize features.
+# Normalize features
 scaler = StandardScaler()
 X_train_norm = scaler.fit_transform(X_train_feat)
 X_test_norm = scaler.transform(X_test_feat)
 
-# Train a Logistic Regression classifier.
+# Train a Logistic Regression classifier
 model = LogisticRegression(max_iter=1000)
 model.fit(X_train_norm, y_train)
 print("Classifier trained.")
 
-# Evaluate the model.
+# Evaluate the model
 preds = model.predict(X_test_norm)
 acc = accuracy_score(y_test, preds)
 print("Final Model Test Accuracy:", acc)
@@ -259,9 +295,9 @@ print("Classification Report:")
 print(classification_report(y_test, preds))
 
 
-#############################
-# Prediction Pipeline for New Input
-#############################
+"""
+Prediction Pipeline for New Input
+"""
 def predict_from_file(input_filepath, segment_duration=5):
     """
     Processes a new CSV file:
@@ -269,14 +305,16 @@ def predict_from_file(input_filepath, segment_duration=5):
       - Segments it by time into 5-second windows,
       - Extracts features,
       - Normalizes the features using the trained scaler,
-      - Predicts labels using the trained classifier.
-    Returns a DataFrame with segment indices and predicted labels.
+      - Predicts labels using the trained classifier
+    Returns a DataFrame with segment indices and predicted labels
     """
+
     df = read_and_clean_csv(input_filepath)
     pp_df = preprocess_data(df)
     segments_list = segment_data_by_time(pp_df, segment_duration=segment_duration)
     if len(segments_list) == 0:
         raise ValueError("Not enough data for segmentation.")
+
     features = [extract_features(seg) for seg in segments_list]
     features_df = pd.DataFrame(features)
     features_norm = scaler.transform(features_df)
@@ -285,14 +323,15 @@ def predict_from_file(input_filepath, segment_duration=5):
         'Segment_Index': np.arange(len(predictions)),
         'Predicted_Label': predictions
     })
+
     print("Prediction complete. First 5 predictions:")
     print(output_df.head())
     return output_df, segments_list
 
 
-#############################
-# Desktop App using Tkinter
-#############################
+"""
+Desktop App using Tkinter
+"""
 def run_app():
     root = tk.Tk()
     root.title("Activity Classification App")
@@ -348,15 +387,3 @@ def run_app():
 
 if __name__ == "__main__":
     run_app()
-
-#############################
-# Print HDF5 File Structure at the End
-#############################
-with h5py.File('project_data.h5', 'r') as h5:
-    print("HDF5 File Structure:")
-    for grp in h5.keys():
-        print(f"\nGroup: {grp}")
-        for subgrp in h5[grp].keys():
-            print(f"  Subgroup: {subgrp}")
-            for ds in h5[grp][subgrp].keys():
-                print(f"    Dataset: {ds}")
