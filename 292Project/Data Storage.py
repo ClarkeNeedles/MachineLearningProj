@@ -2,6 +2,7 @@ import h5py
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 from scipy.stats import skew, kurtosis
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -444,11 +445,15 @@ def run_app():
             # Configure plot
             plt.style.use('ggplot')
             fig, ax = plt.subplots(figsize=(9, 5))
+
+            # Define a discrete colormap: e.g., blue for 0 (walking), red for 1 (jumping)
+            cmap = ListedColormap(['#1f77b4', '#d62728'])  # or any 2 colors you prefer
+
             scatter = ax.scatter(
                 output_df['Segment_Index'],
                 output_df['Predicted_Label'],
                 c=output_df['Predicted_Label'],
-                cmap='RdYlBu',
+                cmap=cmap,
                 marker='o',
                 s=120,
                 alpha=0.8,
@@ -461,8 +466,11 @@ def run_app():
             ax.set_title("Prediction Results (5-Second Segments)", fontsize=13, pad=15)
             ax.grid(True, linestyle=':', alpha=0.7)
 
-            cbar = plt.colorbar(scatter)
-            cbar.set_label('1: Jumping | 0: Walking', rotation=270, labelpad=15)
+            # Optional: Create custom colorbar with labels for discrete values
+            cbar = plt.colorbar(scatter, ticks=[0, 1])
+            cbar.ax.set_yticklabels(['Walking', 'Jumping'])
+            cbar.set_label('Activity Type', rotation=270, labelpad=15)
+
             plt.tight_layout()
             plt.show()
 
