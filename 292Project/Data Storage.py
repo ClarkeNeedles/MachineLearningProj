@@ -288,8 +288,19 @@ acc = accuracy_score(y_test, preds)
 print("Final Model Test Accuracy:", acc)
 print("Confusion Matrix:")
 print(confusion_matrix(y_test, preds))
-print("Classification Report:")
-print(classification_report(y_test, preds))
+cm = confusion_matrix(y_test, preds)
+TN, FP, FN, TP = cm.ravel()
+
+sensitivity = TP / (TP + FN)
+specificity = TN / (TN + FP)
+precision = TP / (TP + FP)
+f1 = 2 * (precision * sensitivity) / (precision + sensitivity)
+false_positive_rate = FP / (FP + TN)
+
+print("Sensitivity:", sensitivity)
+print("Specificity:", specificity)
+print("Precision:", precision)
+
 
 
 """
