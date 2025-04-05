@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
-from scipy.stats import skew, kurtosis
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
@@ -111,16 +110,11 @@ def segment_data_by_time(pp_df, segment_duration=5):
     print(f"Segmented into {len(segments)} segments of ~{segment_duration} seconds each.")
     return segments
 
-
 def extract_features(segment):
     """
     Extracts 17 features from a segment
-    For each axis (x, y, z), computes:
-      - Mean, Standard Deviation, Minimum, Maximum, and Range
-    Additionally, computes:
-      - max_jerk: the maximum absolute difference between consecutive samples across all axes
-      - max_acc: the maximum L2 norm (overall acceleration magnitude) across the segment
-    Returns a dictionary of 17 features
+    For each axis, get Mean, Standard Deviation, Minimum, Maximum, and Range
+    Also get max_jerk and max_acc
     """
 
     features = {}
@@ -152,7 +146,7 @@ def extract_features(segment):
 
 def get_label_from_filename(filepath):
     """
-    Returns 1 if "Jumping" is in the file name, 0 if "Walking" is in the file name
+    Returns 1 if "Jumping" is in the file name, 0 if "Walking" is in the file name for labels
     """
 
     base = os.path.basename(filepath)
@@ -271,8 +265,7 @@ print("Combined Features DataFrame (first 5 rows):")
 print(features_df.head())
 
 # Split features (X) and labels (y) into training (90%) and testing (10%) sets
-X_train_feat, X_test_feat, y_train, y_test = train_test_split(features_df, all_labels, test_size=0.1, random_state=42,
-                                                              shuffle=True)
+X_train_feat, X_test_feat, y_train, y_test = train_test_split(features_df, all_labels, test_size=0.1, random_state=42, shuffle=True)
 print("Training feature set shape:", X_train_feat.shape)
 print("Testing feature set shape:", X_test_feat.shape)
 
@@ -284,9 +277,8 @@ X_test_norm = scaler.transform(X_test_feat)
 # Train a Logistic Regression classifier
 model = LogisticRegression(max_iter=1000)
 model.fit(X_train_norm, y_train)
-print("Classifier trained.")
 
-# Evaluate the model
+# Evaluate model
 preds = model.predict(X_test_norm)
 acc = accuracy_score(y_test, preds)
 print("Final Model Test Accuracy:", acc)
@@ -301,20 +293,15 @@ Prediction Pipeline for New Input
 """
 def predict_from_file(input_filepath, segment_duration=5):
     """
-    Processes a new CSV file:
-      - Reads and preprocesses the data,
-      - Segments it by time into 5-second windows,
-      - Extracts features,
-      - Normalizes the features using the trained scaler,
-      - Predicts labels using the trained classifier
-    Returns a DataFrame with segment indices and predicted labels
+    Processes a new CSV file: Reads and preprocesses the data, segments it by time into 5-second windows, extracts features, normalizes the features
+    using the trained scaler, predicts labels using the trained classifier and returns a DataFrame with segment indices and predicted labels
     """
 
     df = read_and_clean_csv(input_filepath)
     pp_df = preprocess_data(df)
     segments_list = segment_data_by_time(pp_df, segment_duration=segment_duration)
     if len(segments_list) == 0:
-        raise ValueError("Not enough data for segmentation.")
+        raise ValueError("Not enough data to create segments")
 
     features = [extract_features(seg) for seg in segments_list]
     features_df = pd.DataFrame(features)
